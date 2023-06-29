@@ -6,7 +6,7 @@ Export-Reg.ps1 - Script to search the registry on the specified network computer
 ## Usage:
     .\Export-Reg.ps1 -Server 'localhost' -Regkey 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing' -Like '\*.4650\*'
 
-Will search the server 'localhost' under the specified registry key for any keys that are like "\*.4650\*".
+Will search the server 'localhost' under the specified registry key for any keys that are like "\*.4650\*" and output a \*.reg format file. 
 
 NOTES:
 - This will display the resulting file to the output stream (console). To save it to a file pipe the stream to Out-File 'filename.reg'.
