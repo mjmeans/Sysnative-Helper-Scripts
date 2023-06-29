@@ -1,8 +1,10 @@
 # Written by: mjmeans 2023-06-27
-# - Updated 2023-06-28
-#   Added ability to -Verbose
-#   Added support for binary values
-#   Removed $file parameter. Just pipe output to Out-File 'filename.reg'
+#   Updated 2023-06-28
+#     Added ability to -Verbose
+#     Added support for binary values
+#     Removed $file parameter. Just pipe output to Out-File 'filename.reg'
+#   Updated 2023-06-29
+#     Wrap binary key=value output to match reg export format
 
 [cmdletbinding()]
 param (
@@ -26,11 +28,14 @@ $out = Invoke-Command -ComputerName $server -ArgumentList $regkey,$like -ScriptB
                 $v=$k.GetValue($p,$null)
                 if ($v -ne $null) {
                     $t=$k.GetValueKind($p)
-                    if ($t -eq 'String') {$tv="""$($v -replace('\\','\\') -replace('\"','\"'))"""}
-                    elseif ($t -eq 'Dword') {$tv="dword:$("{0:x8}" -f $v)"}
-                    elseif ($t -eq 'Binary') {$tv=($v|ForEach-Object ToString X2) -join ','}
+                    if ($t -eq 'String')
+                        {Write-Output """$p""=""$($v -replace('\\','\\') -replace('\"','\"'))"""}
+                    elseif ($t -eq 'Dword')
+                        {Write-Output """$p""=dword:$("{0:x8}" -f $v)"}
+                    elseif ($t -eq 'Binary')
+                        {Write-Output (("""$p""=hex:"+(($v|ForEach-Object ToString X2) -join ',')) -replace '(^".{76},)|(.{74},)', "`$1`$2\`r`n  ")}
                     else {throw "unexpected registry value type: `n`r Key: $k`r`n Property: $p`r`n Type: $t`r`n Value: $v"}
-                    Write-Output """$p""=$tv"
+                   # Write-Output """$p""=""
                 }
             }
         } 
