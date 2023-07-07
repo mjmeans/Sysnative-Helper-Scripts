@@ -1,6 +1,6 @@
 [CmdletBinding()]
 Param(
-	[string]$Script = "SFCFixScript.txt",
+	[string]$Script,
 	[string]$SysNativeToolsPath = '.\',
 )
 
@@ -8,21 +8,31 @@ Param(
 . .\Write-Log.ps1
 
 ## Constants
-$processName = 'ComponentsScanner.exe'
+$processName = 'SFCFix.exe'
 
 ## Verify before run
 $processPath = Join-Path -Path $SysNativeToolsPath -ChildPath $processName
 if (!(Test-Path -Path $processPath -PathType Leaf))
 {
-	Write-Log -Level ERROR "FILE_NOT_FOUND: `"$processPath`""
+	Write-Log -Level ERROR "PATH_NOT_FOUND: `"$processPath`""
 	Write-Log "Specify the location of the SysNative tools using -SysNativeToolPath <directory>"
     exit
 }
+if ($Script -ne $null) {
+	if (!(Test-Path -Path $Script -PathType Leaf))
+	{
+		Write-Log -Level ERROR "FILE_NOT_FOUND: `"$Script`""
+		Write-Log "Specify the script file using -Script <file>"
+		exit
+	}
+}
 
 ## Run
-$argumentList = "`"$Script`""
+if ($Script -ne $null) {
+	$argumentList = "`"$Script`""
+}
 Write-Log "Starting `"$processPath`" $argumentList"
-$out = Start-Process -FilePath $processPath -ArgumentList $argumentList -Wait -PassThru -NoNewWindow -RedirectStandardOutput $logFile
+$out = Start-Process -FilePath $processPath -ArgumentList $argumentList -Wait -PassThru -NoNewWindow | Out-File $logFile
 if ($out.ExitCode -ne 0) { 
 	Write-Log -Level ERROR "Process returned error $($out.ExitCode)"
 	exit
