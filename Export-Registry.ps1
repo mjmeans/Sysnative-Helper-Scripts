@@ -16,8 +16,8 @@
 	The path to the output *.reg file you want to create. This will overwrite the file without warning.
 	
 	.Example
-	# Export a *.reg file containing all keys under 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing' that match the wildcard string '*.4650_*'.
-    Export-Registry -RegKey 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing' -Like *.4650_* -OutFile out.reg
+	# Export a *.reg file containing all keys under 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths' that match the wildcard string '*in*'.
+    Export-Registry -RegKey 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths' -Like *in* -OutFile out.reg
 
 #>
 
@@ -38,6 +38,11 @@
 # TO DO
 #    Add remote option back in
 #    Verify that $RegKey is an actual registry key instead of something else
+#
+# TEST
+#    Import test file '_Test_Reg-Export.reg' into registry
+#    PV> .\Export-Registry.ps1 -RegKey 'HKLM:\SOFTWARE\_Test' -Like '*Reg-Export*' -OutFile 'out.reg' -Verbose
+#    Compare the '_Test_Reg-Export.reg' to the 'out.reg' file
 
 [CmdletBinding()]
 Param (
@@ -48,6 +53,7 @@ Param (
 
 ## Includes
 . .\Write-Log.ps1
+. .\Format-RegExport.ps1
 
 ## Constants
 $crlf = "`r`n"
@@ -60,56 +66,16 @@ if (!(Test-Path -Path $RegKey -PathType Container))
     exit
 }
 
-Write-Log "Searching $(Join-Path $RegKey $Like)"
-Write-Output 'Windows Registry Editor Version 5.00' | Out-File $OutFile
-
 $key = Get-Item $RegKey
-Write-Output "$crlf[$key]" | Out-File $OutFile -Append
+$search = Join-Path $key $Like
+Write-Log "Searching $search"
+Write-Output 'Windows Registry Editor Version 5.00' | Out-File $OutFile -Encoding unicode
 
-$keys = Get-ChildItem $Regkey -Recurse -Verbose | Where-Object {($_.Name -like (Join-Path $key $Like))}
+$keys = Get-ChildItem $Regkey -Recurse -Verbose | Where-Object {($_.Name -like $search)}
 foreach ($k in $keys) {
-    Write-Verbose "Processing key $k"
-    Write-Output "$crlf[$k]" | Out-File $OutFile -Append
-    foreach ($prop in $k.Property) {
-	    Write-Verbose "- Processing property $prop"
-        $p=$prop
-        if ($prop -eq '(default)') {
-            $v=$k.GetValue('',$null,"DoNotExpandEnvironmentNames")
-            $p='@'
-        } else {
-            $v=$k.GetValue($prop,$null,"DoNotExpandEnvironmentNames")
-            $p="`"$prop`""
-        }
-	    Write-Verbose "- Value is $v"
-	    if ($v -ne $null) {
-            if ($prop -eq '(default)') {
-                $t=$k.GetValueKind('')
-            } else {
-                $t=$k.GetValueKind($prop)
-            }
-		    if ($t -eq 'String') {
-                $pv = "$p=`"$($v -replace('\\','\\') -replace('\"','\"'))`""
-                Write-Output $pv | Out-File $OutFile -Append
-            } elseif ($t -eq 'Dword') {
-                $pv = "$p=dword:$("{0:x8}" -f $v)"
-                Write-Output $pv | Out-File $OutFile -Append
-            } elseif ($t -eq 'Binary') {
-                $pv = "$p=hex:"+(($v|ForEach-Object ToString x2) -join ',')
-                $pv = ($pv -replace '((^.{76,78},)|(.{74,76},))', "`$1\`r`n  ")
-                Write-Output $pv | Out-File $OutFile -Append
-            } elseif ($t -eq 'ExpandString') {
-                $a = [System.Text.Encoding]::Unicode.GetBytes($v)
-                $pv = "$p=hex(2):"+(($a|ForEach-Object ToString x2) -join ',') +',00,00'
-                $pv = ($pv -replace '((^.{76,78},)|(.{74,76},))', "`$1\`r`n  ")
-                Write-Output $pv | Out-File $OutFile -Append
-            } else {
-                throw "unexpected registry value type: `n`r Key: $k`r`n Property: $p`r`n Type: $t`r`n Value: $v"
-                # todo hex(7) type
-                exit
-            }
-	    }
-    }
+    Format-RegExport -InputObject $k | Out-File $OutFile -Append -Encoding unicode    
 } 
 
-Write-Output "" | Out-File $OutFile -Append
+
+Write-Output "" | Out-File $OutFile -Append -Encoding unicode
 Write-Log "Completed"
